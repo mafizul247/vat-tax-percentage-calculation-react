@@ -31,35 +31,38 @@ export function parseAmount(formatted) {
 }
 
 /**
- * VAT and tax are tracked as two separate rates.
+ * Tax is charged on the base amount; VAT is then charged on top of the
+ * tax-inclusive amount (Base + Tax) — i.e. the tax amount is itself
+ * "vatable". When backing a total out (Including), the deduction works the
+ * same way in reverse: Tax comes off the VAT-free amount first.
  *
  * Excluding (the amount does NOT yet include VAT/tax — both are added on top):
  *   Base  = Amount
- *   VAT   = Amount × vatRate
- *   Tax   = Amount × taxRate
- *   Total = Amount + VAT + Tax
+ *   Tax   = Base × taxRate
+ *   VAT   = (Base + Tax) × vatRate
+ *   Total = Base + Tax + VAT
  *
  * Including (the amount already includes VAT and tax — both are pulled back out):
- *   Base  = Amount ÷ (1 + vatRate + taxRate)
- *   VAT   = Base × vatRate
+ *   Base  = Amount ÷ [(1 + taxRate) × (1 + vatRate)]
  *   Tax   = Base × taxRate
- *   Total = Base + VAT + Tax   (equals the amount you entered)
+ *   VAT   = (Base + Tax) × vatRate
+ *   Total = Base + Tax + VAT   (equals the amount you entered)
  */
 export function calculate(amount, vatRatePercent, taxRatePercent, mode) {
   const vr = (vatRatePercent || 0) / 100;
   const tr = (taxRatePercent || 0) / 100;
 
   if (mode === "including") {
-    const base = amount / (1 + vr + tr);
-    const vat = base * vr;
+    const base = amount / ((1 + tr) * (1 + vr));
     const tax = base * tr;
-    return { base, vat, tax, total: base + vat + tax };
+    const vat = (base + tax) * vr;
+    return { base, vat, tax, total: base + tax + vat };
   }
 
   const base = amount;
-  const vat = amount * vr;
-  const tax = amount * tr;
-  return { base, vat, tax, total: base + vat + tax };
+  const tax = base * tr;
+  const vat = (base + tax) * vr;
+  return { base, vat, tax, total: base + tax + vat };
 }
 
 /** A torn/perforated receipt-bottom edge, as a CSS clip-path polygon. */
